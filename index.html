@@ -289,7 +289,10 @@
   .ideas{flex:1;min-height:0;display:flex;flex-direction:column;width:100%}
   .nb-meta{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--faint);font-variant-numeric:tabular-nums}
   .nb-wrap{flex:1;min-height:0;display:flex;justify-content:center;padding:22px 22px 26px}
-  .nb-sheet{width:100%;max-width:768px;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);overflow:hidden}
+  .nb-sheet{position:relative;width:100%;max-width:768px;display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);overflow:hidden}
+  .nb-plan{position:absolute;right:16px;bottom:16px;z-index:5;display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:10px 16px;font-family:var(--ui);font-weight:700;font-size:12.5px;letter-spacing:.01em;box-shadow:var(--shadow);cursor:pointer;transition:transform .12s,filter .12s}
+  .nb-plan:hover{filter:brightness(1.06)}
+  .nb-plan:active{transform:scale(.97)}
   .notebook{
     flex:1;min-height:0;width:100%;overflow:auto;resize:none;border:0;outline:none;display:block;
     color:var(--ink);font-family:var(--ui);font-size:15px;letter-spacing:.005em;
@@ -302,6 +305,12 @@
     caret-color:var(--accent);
   }
   .notebook::placeholder{color:var(--faint);font-style:italic}
+
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 8px 11px 16px;border-radius:999px;display:flex;align-items:center;gap:12px;box-shadow:0 12px 32px -10px rgba(0,0,0,.4);z-index:60;font-size:13px;font-weight:600;max-width:calc(100vw - 32px)}
+  .toast .msg{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .toast button{background:color-mix(in srgb, var(--bg) 16%, transparent);border:0;color:var(--bg);font-family:var(--ui);font-weight:700;cursor:pointer;padding:6px 12px;border-radius:999px;font-size:12.5px;transition:background .12s}
+  .toast button:hover{background:color-mix(in srgb, var(--bg) 26%, transparent)}
 
   @media (max-width:860px){
     #view-planner.active,#view-content.active{display:block;overflow:auto}
@@ -438,12 +447,16 @@
           <div class="nb-sheet">
             <textarea class="notebook" id="notebook" spellcheck="true" aria-label="Idea notebook" placeholder="Brain-dump anything — hooks, series ideas, video titles, things you noticed today, a bit you want to try…
 
-Nothing here is scheduled. It's just a place to think out loud."></textarea>
+Nothing here is scheduled. It's just a place to think out loud.
+
+Tip: select a line, then hit “→ Plan this” to send it to your Content pipeline."></textarea>
+            <button class="nb-plan" id="nb-plan" hidden>→ Plan this</button>
           </div>
         </div>
       </div>
     </section>
   </div>
+  <div class="toast" id="toast" hidden></div>
 </div>
 
 <script>
@@ -585,6 +598,7 @@ Nothing here is scheduled. It's just a place to think out loud."></textarea>
     state.view=v;
     [["planner","tab-planner","view-planner"],["content","tab-content","view-content"],["ideas","tab-ideas","view-ideas"]]
       .forEach(([name,tabId,viewId])=>{ $(tabId).setAttribute("aria-selected", v===name); $(viewId).classList.toggle("active", v===name); });
+    if(v!=="ideas"){ const p=$("nb-plan"); if(p) p.hidden=true; }
     if(v==="content"){ renderContentCal(); renderContentDay(); }
     else if(v==="ideas"){ renderIdeas(); }
     else { renderPlannerCal(); renderPlannerDay(); }
@@ -898,6 +912,30 @@ Nothing here is scheduled. It's just a place to think out loud."></textarea>
     if(ta && document.activeElement!==ta) ta.value=state.ideas||"";
     updateNbMeta();
   }
+  function nbSelText(){
+    const ta=$("notebook"); const s=ta.selectionStart, e=ta.selectionEnd;
+    if(e>s){ const raw=ta.value.slice(s,e); if(raw.trim()) return raw.trim().replace(/\s+/g," "); }
+    return "";
+  }
+  function nbSyncPlanBtn(){ $("nb-plan").hidden = !nbSelText(); }
+  function planFromSelection(){
+    const title=nbSelText(); if(!title) return;
+    const id=uid();
+    state.content[id]={platform:"instagram", status:"idea", title:title, notes:"", date:"", createdAt:Date.now()};
+    persistContent(id,true);
+    $("nb-plan").hidden=true;
+    showToast("Added to Content · Unscheduled","View", ()=>{ state.filter="all"; document.querySelectorAll(".filt").forEach(x=>x.setAttribute("aria-selected", x.dataset.p==="all")); setView("content"); });
+  }
+
+  /* toast */
+  let toastTimer=null;
+  function showToast(msg, actionLabel, onAction){
+    const t=$("toast"); t.innerHTML="";
+    const m=el("span","msg"); m.textContent=msg; t.appendChild(m);
+    if(actionLabel){ const b=el("button"); b.textContent=actionLabel; b.onclick=()=>{ hideToast(); if(onAction) onAction(); }; t.appendChild(b); }
+    t.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(hideToast, 5500);
+  }
+  function hideToast(){ $("toast").hidden=true; }
 
   /* ---------------- theme ---------------- */
   const THEME_KEY="daybook.theme";
@@ -934,7 +972,11 @@ Nothing here is scheduled. It's just a place to think out loud."></textarea>
   renderPlannerCal(); renderPlannerDay();
   renderContentCal(); renderContentDay();
   $("notebook").value = state.ideas || "";
-  $("notebook").addEventListener("input",()=>{ state.ideas=$("notebook").value; persistIdeas(); updateNbMeta(); });
+  $("notebook").addEventListener("input",()=>{ state.ideas=$("notebook").value; persistIdeas(); updateNbMeta(); nbSyncPlanBtn(); });
+  ["mouseup","keyup","select"].forEach(ev=> $("notebook").addEventListener(ev, nbSyncPlanBtn));
+  $("notebook").addEventListener("scroll", ()=>{ if(nbSelText()) $("nb-plan").hidden=false; });
+  $("nb-plan").addEventListener("mousedown", e=>e.preventDefault()); // keep the textarea selection on click
+  $("nb-plan").addEventListener("click", planFromSelection);
   updateNbMeta();
   initCloud();
 })();
