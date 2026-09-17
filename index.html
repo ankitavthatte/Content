@@ -294,15 +294,36 @@
     .day{overflow:visible}
   }
   @media (max-width:560px){
-    .topbar{flex-wrap:wrap;gap:12px;padding:12px 16px}
+    .topbar{flex-wrap:wrap;row-gap:10px;column-gap:12px;padding:12px 16px}
+    .brand{order:1}
     .brand .tag{display:none}
+    .spacer{display:none}
     .sync{display:none}
+    .theme-toggle{order:2;margin-left:auto}
+    .tabs{order:3;flex:1 1 100%;justify-content:center}
+    .tab{flex:1;justify-content:center}
     .cal-wrap,.day{padding-left:16px;padding-right:16px}
-    .board-head{padding:14px 16px}
+    .cal-wrap{padding-top:18px}
+    .board-head{padding:14px 16px 12px}
+    .board-head h2{font-size:20px}
+    .filters{margin-left:0;flex:1 1 100%;justify-content:center}
     .cal-title{font-size:22px}
     .day-head h2{font-size:26px}
-    .grid{gap:4px}
-    .cell{min-height:60px!important;padding:6px}
+    .grid{gap:5px}
+    .cell{min-height:62px!important;padding:6px 5px}
+    /* planner: text chips become status dots */
+    .planner-grid .marks{gap:4px}
+    .planner-grid .chip{font-size:0;line-height:0;padding:0;width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+    /* content: title chips become compact platform-logo markers */
+    .cal-items{flex-direction:row;flex-wrap:wrap;gap:3px;align-items:center}
+    .cal-item{padding:2px;border-left-width:0;border-radius:6px;gap:0}
+    .cal-item .tx{display:none}
+    .cal-item .logo{width:14px;height:14px}
+    .cal-item .logo svg{width:13px;height:13px}
+    .cal-more{width:100%;padding-left:2px;line-height:1}
+    /* day panel add row: keep the time picker from crowding the field */
+    .add input[type="time"]{width:92px}
+    .pf-btn{padding:11px 8px}
   }
   @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 </style>
