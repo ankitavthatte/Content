@@ -130,8 +130,38 @@
   .spacer{flex:1}
   .sync{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted);font-weight:500;padding:5px 11px;border:1px solid var(--line);border-radius:999px;white-space:nowrap}
   .sync .led{width:7px;height:7px;border-radius:50%;background:var(--faint);flex:0 0 auto}
+  .sync{cursor:pointer}
+  .sync:hover{border-color:var(--line-strong)}
   .sync[data-state="synced"] .led{background:var(--good);box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 22%,transparent)}
   .sync[data-state="local"] .led{background:var(--s-editing)}
+  .sync[data-state="connecting"] .led{background:var(--s-editing);animation:led-pulse 1s ease-in-out infinite}
+  .sync[data-state="error"] .led{background:var(--yt)}
+  @keyframes led-pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+  /* sync modal */
+  .modal-scrim{position:fixed;inset:0;background:rgba(20,14,22,.5);backdrop-filter:blur(3px);z-index:80;display:flex;align-items:center;justify-content:center;padding:20px}
+  .modal{width:100%;max-width:452px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:0 20px 60px -18px rgba(0,0,0,.5);padding:20px 20px 18px;display:flex;flex-direction:column;gap:12px}
+  .modal-head{display:flex;align-items:center;justify-content:space-between}
+  .modal-head h3{margin:0;font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:-.01em}
+  .modal-x{border:0;background:transparent;color:var(--muted);font-size:15px;width:30px;height:30px;border-radius:8px;cursor:pointer;display:grid;place-items:center}
+  .modal-x:hover{background:var(--surface-2);color:var(--ink)}
+  .modal-lede{margin:0;font-size:12.5px;color:var(--muted);line-height:1.55}
+  .modal-label{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-top:2px}
+  .code-row{display:flex;gap:8px}
+  .code-input{flex:1;min-width:0;border:1px solid var(--line);background:var(--surface-2);border-radius:var(--r-sm);padding:10px 12px;font-family:var(--ui);font-size:13px;letter-spacing:.03em;color:var(--ink)}
+  .code-input:focus{outline:none;border-color:var(--accent)}
+  .code-btn{flex:0 0 auto;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-sm);padding:0 15px;font-weight:600;font-size:12.5px;color:var(--ink);cursor:pointer}
+  .code-btn:hover{background:var(--surface-2);border-color:var(--line-strong)}
+  .modal-actions{display:flex;align-items:center;gap:10px;margin-top:2px}
+  .btn-ghost{border:0;background:transparent;color:var(--accent);font-weight:600;font-size:12.5px;cursor:pointer;padding:6px 2px;margin-right:auto}
+  .btn-ghost:hover{text-decoration:underline}
+  .btn-primary{border:0;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:13px;padding:10px 18px;border-radius:var(--r-sm);cursor:pointer}
+  .btn-primary:hover{filter:brightness(1.06)}
+  .modal-status{font-size:12px;color:var(--muted);min-height:16px;line-height:1.5}
+  .modal-foot{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:12px;margin-top:2px}
+  .btn-quiet{border:0;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline;padding:3px 0;align-self:flex-start;font-family:var(--ui)}
+  .btn-quiet:hover{color:var(--ink)}
+  .btn-quiet.danger:hover{color:var(--yt)}
   .theme-toggle{width:34px;height:34px;flex:0 0 auto;border:1px solid var(--line);background:var(--surface);border-radius:9px;color:var(--ink);display:grid;place-items:center;transition:background .15s,border-color .15s,transform .3s}
   .theme-toggle:hover{background:var(--surface-2);border-color:var(--line-strong)}
   .theme-toggle:active{transform:rotate(35deg)}
@@ -355,7 +385,7 @@
     .nb-wrap{padding:14px 12px 18px}
     .notebook{padding:12px 18px 40px}
   }
-  @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important;animation:none!important}}
 </style>
 
 <div id="app">
@@ -457,6 +487,30 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
     </section>
   </div>
   <div class="toast" id="toast" hidden></div>
+
+  <div class="modal-scrim" id="sync-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sync-modal-title">
+      <div class="modal-head">
+        <h3 id="sync-modal-title">Sync across devices</h3>
+        <button class="modal-x" id="sync-close" aria-label="Close">✕</button>
+      </div>
+      <p class="modal-lede">Use the <b>same sync code</b> on every device — desktop and phone — and your planner, content and ideas stay in sync automatically. Set it up on the device that has your data first, then add the code on your other devices. Keep the code private.</p>
+      <label class="modal-label" for="sync-code-input">Your sync code</label>
+      <div class="code-row">
+        <input class="code-input" id="sync-code-input" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Paste a code, or generate one">
+        <button class="code-btn" id="sync-copy" title="Copy code">Copy</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-ghost" id="sync-generate">Generate new code</button>
+        <button class="btn-primary" id="sync-connect">Turn on sync</button>
+      </div>
+      <div class="modal-status" id="sync-modal-status"></div>
+      <div class="modal-foot">
+        <button class="btn-quiet" id="sync-link" hidden>Copy a link to open on another device</button>
+        <button class="btn-quiet danger" id="sync-disconnect" hidden>Stop syncing on this device</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -492,6 +546,15 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
   ];
 
   const LS_KEY = "daybook.v1";
+  const SYNC_KEY = "daybook.sync";
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyClEUFuHAQQoWHJ4CES2RZ6KJBNZ-57JO8",
+    authDomain: "contentandcalendar.firebaseapp.com",
+    projectId: "contentandcalendar",
+    storageBucket: "contentandcalendar.firebasestorage.app",
+    messagingSenderId: "626513891722",
+    appId: "1:626513891722:web:f71c884574df2cb125f873"
+  };
 
   /* ---------------- helpers ---------------- */
   function keyOf(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
@@ -530,29 +593,143 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
     }catch(e){}
   }
   function persistDay(k, immediate){
-    saveLocal(); if(!daysCol) return; clearTimeout(dayTimers[k]);
+    saveLocal(); if(fbDoc) pushAll();
+    if(!daysCol) return; clearTimeout(dayTimers[k]);
     const go=()=>{ const d=state.days[k]; if(!d) return; daysCol.doc(k).set({activities:d.activities||[], todos:d.todos||[]}).catch(()=>{}); };
     if(immediate) go(); else dayTimers[k]=setTimeout(go,450);
   }
   function persistContent(id, immediate){
-    saveLocal(); if(!contentCol) return; clearTimeout(contentTimers[id]);
+    saveLocal(); if(fbDoc) pushAll();
+    if(!contentCol) return; clearTimeout(contentTimers[id]);
     const go=()=>{ const c=state.content[id]; if(!c) return;
       contentCol.doc(id).set({platform:c.platform,status:c.status,title:c.title||"",notes:c.notes||"",date:c.date||"",createdAt:c.createdAt||Date.now()}).catch(()=>{}); };
     if(immediate) go(); else contentTimers[id]=setTimeout(go,450);
   }
-  function deleteContentRemote(id){ saveLocal(); if(contentCol) contentCol.doc(id).delete().catch(()=>{}); }
+  function deleteContentRemote(id){ saveLocal(); if(fbDoc) pushAll(); if(contentCol) contentCol.doc(id).delete().catch(()=>{}); }
   function persistIdeas(immediate){
-    saveLocal(); if(!ideasDoc) return; clearTimeout(ideasTimer);
+    saveLocal(); if(fbDoc) pushAll();
+    if(!ideasDoc) return; clearTimeout(ideasTimer);
     const go=()=> ideasDoc.set({text:state.ideas||"", updatedAt:Date.now()}).catch(()=>{});
     if(immediate) go(); else ideasTimer=setTimeout(go,500);
   }
 
   function setSync(name){
-    $("sync").dataset.state=name;
-    $("sync-label").textContent = name==="synced" ? "Synced to your account" : "Saved on this device";
+    const s=$("sync"); if(!s) return;
+    s.dataset.state=name;
+    const labels={synced:"Synced across devices", connecting:"Connecting…", error:"Sync error — tap to retry", local:"Saved on this device"};
+    $("sync-label").textContent = labels[name] || labels.local;
   }
 
-  async function initCloud(){
+  /* ---------------- cross-device sync (standalone / GitHub Pages) ---------------- */
+  let fbDb=null, fbDoc=null, fbUnsub=null, fbTimer=null, syncCode=null, standaloneMode=false;
+
+  function loadFirebase(cb){
+    if(typeof firebase!=="undefined" && firebase.apps){ cb(); return; }
+    const base="https://cdn.jsdelivr.net/npm/firebase@10.12.2/";
+    const s1=document.createElement("script"); s1.src=base+"firebase-app-compat.js";
+    s1.onload=()=>{ const s2=document.createElement("script"); s2.src=base+"firebase-firestore-compat.js"; s2.onload=cb; s2.onerror=cb; document.head.appendChild(s2); };
+    s1.onerror=cb; document.head.appendChild(s1);
+  }
+  function genCode(){
+    const cs="abcdefghijkmnpqrstuvwxyz23456789"; let out="";
+    if(window.crypto&&crypto.getRandomValues){ const a=new Uint32Array(20); crypto.getRandomValues(a); for(let i=0;i<20;i++) out+=cs[a[i]%cs.length]; }
+    else { for(let i=0;i<20;i++) out+=cs[Math.floor(Math.random()*cs.length)]; }
+    return out;
+  }
+  function unionById(a,b){ const m={}; (a||[]).forEach(x=>{ if(x&&x.id) m[x.id]=x; }); (b||[]).forEach(x=>{ if(x&&x.id) m[x.id]=x; }); return Object.values(m); }
+
+  function initFirebaseSync(){
+    standaloneMode=true;
+    let saved=null; try{ saved=localStorage.getItem(SYNC_KEY); }catch(e){}
+    let hashCode=null; try{ const m=(location.hash||"").match(/sync=([a-z0-9]+)/i); if(m){ hashCode=m[1]; history.replaceState(null,"",location.pathname+location.search); } }catch(e){}
+    const code = hashCode || saved;
+    loadFirebase(()=>{
+      if(typeof firebase==="undefined" || !firebase.firestore){ setSync("local"); updateSyncUI(); return; }
+      try{ if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG); }catch(e){}
+      try{ fbDb = firebase.firestore(); }catch(e){ fbDb=null; }
+      if(!fbDb){ setSync("local"); updateSyncUI(); return; }
+      if(code){ connectSync(code); } else { setSync("local"); updateSyncUI(); }
+    });
+  }
+
+  function applyRemote(d){
+    if(!d) return;
+    state.days = (d.days && typeof d.days==="object") ? d.days : {};
+    state.content = (d.content && typeof d.content==="object") ? d.content : {};
+    Object.values(state.content).forEach(c=>{ if(typeof c.date!=="string") c.date=""; });
+    if(typeof d.ideas==="string") state.ideas=d.ideas;
+    saveLocal();
+    const ae=document.activeElement;
+    const editing = ae && (ae.tagName==="INPUT" || ae.tagName==="TEXTAREA");
+    if(state.view==="ideas"){ renderIdeas(); }
+    else if(!editing){
+      if(state.view==="planner"){ renderPlannerCal(); renderPlannerDay(); }
+      else if(state.view==="content"){ renderContentCal(); renderContentDay(); }
+    }
+  }
+  function mergeRemote(r){
+    const rd=r.days||{}, rc=r.content||{};
+    for(const k in rd){ const ld=state.days[k]||{activities:[],todos:[]}; const day=rd[k]||{};
+      state.days[k]={ activities:unionById(ld.activities, day.activities), todos:unionById(ld.todos, day.todos) }; }
+    for(const id in rc){ state.content[id]=rc[id]; }
+    Object.values(state.content).forEach(c=>{ if(typeof c.date!=="string") c.date=""; });
+    const ri = typeof r.ideas==="string"?r.ideas:"";
+    if(ri && ri!==(state.ideas||"")){ state.ideas = (state.ideas ? state.ideas.replace(/\s+$/,"")+"\n\n" : "") + ri; }
+    saveLocal();
+  }
+  function pushAll(immediate){
+    if(!fbDoc) return; clearTimeout(fbTimer);
+    const go=()=> fbDoc.set({days:state.days, content:state.content, ideas:state.ideas||"", updatedAt:Date.now()}).catch(()=>{ setSync("error"); updateSyncUI(); });
+    if(immediate) go(); else fbTimer=setTimeout(go, 700);
+  }
+  function connectSync(code){
+    if(!fbDb || !code) return;
+    syncCode = code;
+    try{ localStorage.setItem(SYNC_KEY, code); }catch(e){}
+    if(fbUnsub){ try{fbUnsub();}catch(e){} fbUnsub=null; }
+    fbDoc = fbDb.collection("daybook").doc(code);
+    setSync("connecting"); updateSyncUI();
+    fbDoc.get().then(snap=>{
+      const remote = snap.exists ? (snap.data()||{}) : null;
+      const remoteHas = remote && ((remote.days&&Object.keys(remote.days).length) || (remote.content&&Object.keys(remote.content).length) || (remote.ideas||"").length);
+      const localHas = Object.keys(state.days).length || Object.keys(state.content).length || (state.ideas||"").length;
+      if(!remoteHas){ pushAll(true); }
+      else if(!localHas){ applyRemote(remote); }
+      else { mergeRemote(remote); applyRemote({days:state.days,content:state.content,ideas:state.ideas}); pushAll(true); }
+      fbUnsub = fbDoc.onSnapshot(s=>{ if(s.metadata && s.metadata.hasPendingWrites) return; if(!s.exists) return; applyRemote(s.data()||{}); }, ()=>{ setSync("error"); updateSyncUI(); });
+      setSync("synced"); updateSyncUI();
+    }).catch(()=>{ setSync("error"); updateSyncUI(); });
+  }
+  function disconnectSync(){
+    if(fbUnsub){ try{fbUnsub();}catch(e){} fbUnsub=null; }
+    if(fbTimer){ clearTimeout(fbTimer); fbTimer=null; }
+    fbDoc=null; syncCode=null;
+    try{ localStorage.removeItem(SYNC_KEY); }catch(e){}
+    setSync("local"); updateSyncUI();
+  }
+
+  function updateSyncUI(){
+    const inp=$("sync-code-input");
+    if(inp && syncCode && document.activeElement!==inp) inp.value=syncCode;
+    const st=$("sync-modal-status");
+    if(st) st.textContent = syncCode ? "On — this device syncs with anyone using this code." : "Off — data is only on this device.";
+    const dis=$("sync-disconnect"); if(dis) dis.hidden = !syncCode;
+    const link=$("sync-link"); if(link) link.hidden = !syncCode;
+  }
+  function openSyncModal(){
+    const inp=$("sync-code-input");
+    if(!syncCode && inp && !inp.value) inp.value=genCode();
+    updateSyncUI();
+    $("sync-modal").hidden=false;
+  }
+  function closeSyncModal(){ $("sync-modal").hidden=true; }
+
+  function initCloud(){
+    if(window.claude && claude.use){ initClaudeDb(); }
+    else { initFirebaseSync(); }
+  }
+
+  async function initClaudeDb(){
     let user=null;
     try{ user = window.claude && claude.use ? await claude.use("user") : null; }catch(e){}
     try{ db = window.claude && claude.use ? await claude.use("db") : null; }catch(e){ db=null; }
@@ -978,6 +1155,19 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
   $("nb-plan").addEventListener("mousedown", e=>e.preventDefault()); // keep the textarea selection on click
   $("nb-plan").addEventListener("click", planFromSelection);
   updateNbMeta();
+
+  // sync modal wiring
+  function setSyncStatus(msg){ const st=$("sync-modal-status"); if(!st) return; st.textContent=msg; }
+  $("sync").addEventListener("click", ()=>{ if(standaloneMode) openSyncModal(); });
+  $("sync-close").onclick=closeSyncModal;
+  $("sync-modal").addEventListener("click", e=>{ if(e.target===$("sync-modal")) closeSyncModal(); });
+  document.addEventListener("keydown", e=>{ if(e.key==="Escape" && !$("sync-modal").hidden) closeSyncModal(); });
+  $("sync-generate").onclick=()=>{ $("sync-code-input").value=genCode(); setSyncStatus("New code ready — tap “Turn on sync”, then add the same code on your other devices."); };
+  $("sync-copy").onclick=()=>{ const v=$("sync-code-input").value.trim(); if(!v) return; try{ navigator.clipboard.writeText(v); }catch(e){} const b=$("sync-copy"), t=b.textContent; b.textContent="Copied"; setTimeout(()=>b.textContent=t,1400); };
+  $("sync-link").onclick=()=>{ if(!syncCode) return; const url=location.origin+location.pathname+"#sync="+syncCode; try{ navigator.clipboard.writeText(url); }catch(e){} const b=$("sync-link"), t=b.textContent; b.textContent="Link copied — open it on your other device"; setTimeout(()=>b.textContent=t,2200); };
+  $("sync-connect").onclick=()=>{ const c=$("sync-code-input").value.trim().toLowerCase().replace(/[^a-z0-9]/g,""); if(c.length<8){ setSyncStatus("That code looks too short — generate one, or paste a full code."); return; } if(!fbDb){ setSyncStatus("Still loading the sync service — try again in a moment."); return; } setSyncStatus("Connecting…"); connectSync(c); };
+  $("sync-disconnect").onclick=()=>{ disconnectSync(); setSyncStatus("Sync turned off on this device. Your data is still saved here."); };
+
   initCloud();
 })();
 </script>
