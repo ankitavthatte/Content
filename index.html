@@ -313,6 +313,9 @@
   .filt[data-p="youtube"] .swatch{background:var(--yt)}
   .filt[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-sm)}
   .filt:hover:not([aria-selected="true"]){color:var(--ink)}
+  .chan-filter{appearance:none;-webkit-appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-family:inherit;font-size:12.5px;font-weight:600;padding:8px 30px 8px 12px;border-radius:var(--r-md);cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+  .chan-filter:hover{border-color:var(--line-strong)}
+  .chan-filter:focus{outline:none;border-color:var(--accent)}
 
   .content{flex:1;min-height:0;display:flex;flex-direction:column;width:100%}
   .content .split{flex:1;min-height:0}
@@ -370,6 +373,7 @@
     .board-head{padding:14px 16px 12px}
     .board-head h2{font-size:20px}
     .filters{margin-left:0;flex:1 1 100%;justify-content:center}
+    .chan-filter{flex:1 1 100%;width:100%}
     .cal-title{font-size:22px}
     .day-head h2{font-size:26px}
     .grid{gap:5px}
@@ -453,6 +457,9 @@
             <button class="filt" data-p="instagram" role="tab" aria-selected="false"><span class="swatch"></span>Instagram</button>
             <button class="filt" data-p="youtube" role="tab" aria-selected="false"><span class="swatch"></span>YouTube</button>
           </div>
+          <select class="chan-filter" id="chan-filter" aria-label="Filter by channel">
+            <option value="all">All channels</option>
+          </select>
         </div>
         <div class="split">
           <div class="cal-wrap">
@@ -535,6 +542,14 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
   ];
   const STATUS_KEYS = STATUSES.map(s=>s.key);
   const statusOf = k => STATUSES.find(s=>s.key===k) || STATUSES[0];
+  const CHANNELS = [
+    {key:"bubu-bibi", label:"Bubu and Bibi"},
+    {key:"ankita",    label:"Ankita Thatte"},
+    {key:"bloom",     label:"Bloom"},
+    {key:"changu",    label:"Changu the Cat"},
+  ];
+  const CHANNEL_KEYS = CHANNELS.map(c=>c.key);
+  const channelOf = k => CHANNELS.find(c=>c.key===k) || null;
   const DOW = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
   const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -546,10 +561,10 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
   const logoSvg = p => p==="youtube" ? YT_SVG : IG_SVG;
 
   const SAMPLE_CONTENT = [
-    {platform:"youtube",  status:"scripting", title:"“3 editing tricks I use every day”", notes:"Hook: “Stop cutting on silence.” Keep it under 6 min.", off:0},
-    {platform:"instagram",status:"filming",   title:"Reel: my real desk setup tour", notes:"B-roll of monitor, plant, coffee. Trending audio, ~18s.", off:1},
-    {platform:"instagram",status:"idea",      title:"Carousel — a week in my life", notes:"7 slides, one per day. Repurpose from the planner.", off:3},
-    {platform:"youtube",  status:"scheduled", title:"Subscriber Q&A", notes:"Collect questions with a story sticker first.", off:5},
+    {platform:"youtube",  channel:"ankita",    status:"scripting", title:"“3 editing tricks I use every day”", notes:"Hook: “Stop cutting on silence.” Keep it under 6 min.", off:0},
+    {platform:"instagram",channel:"bubu-bibi", status:"filming",   title:"Reel: my real desk setup tour", notes:"B-roll of monitor, plant, coffee. Trending audio, ~18s.", off:1},
+    {platform:"instagram",channel:"changu",    status:"idea",      title:"Carousel — a week in my life", notes:"7 slides, one per day. Repurpose from the planner.", off:3},
+    {platform:"youtube",  channel:"bloom",     status:"scheduled", title:"Subscriber Q&A", notes:"Collect questions with a story sticker first.", off:5},
   ];
 
   const LS_KEY = "daybook.v1";
@@ -581,6 +596,7 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
     content:{},        // id -> {platform,status,title,notes,date,createdAt}
     ideas:"",          // free-form notebook text
     filter:"all",
+    channelFilter:"all",
     pCal:{y:today.getFullYear(), m:today.getMonth()}, pSel:keyOf(today),
     cCal:{y:today.getFullYear(), m:today.getMonth()}, cSel:keyOf(today),
   };
@@ -595,7 +611,7 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
   function loadLocal(){
     try{ const raw=localStorage.getItem(LS_KEY); if(!raw) return; const o=JSON.parse(raw);
       if(o&&o.days) state.days=o.days;
-      if(o&&o.content){ state.content=o.content; Object.values(state.content).forEach(c=>{ if(typeof c.date!=="string") c.date=""; }); }
+      if(o&&o.content){ state.content=o.content; Object.values(state.content).forEach(c=>{ if(typeof c.date!=="string") c.date=""; if(!CHANNEL_KEYS.includes(c.channel)) c.channel=""; }); }
       if(o&&typeof o.ideas==="string") state.ideas=o.ideas;
     }catch(e){}
   }
@@ -609,7 +625,7 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
     saveLocal(); if(fbDoc) pushAll();
     if(!contentCol) return; clearTimeout(contentTimers[id]);
     const go=()=>{ const c=state.content[id]; if(!c) return;
-      contentCol.doc(id).set({platform:c.platform,status:c.status,title:c.title||"",notes:c.notes||"",date:c.date||"",createdAt:c.createdAt||Date.now()}).catch(()=>{}); };
+      contentCol.doc(id).set({platform:c.platform,channel:c.channel||"",status:c.status,title:c.title||"",notes:c.notes||"",date:c.date||"",createdAt:c.createdAt||Date.now()}).catch(()=>{}); };
     if(immediate) go(); else contentTimers[id]=setTimeout(go,450);
   }
   function deleteContentRemote(id){ saveLocal(); if(fbDoc) pushAll(); if(contentCol) contentCol.doc(id).delete().catch(()=>{}); }
@@ -663,7 +679,7 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
     if(!d) return;
     state.days = (d.days && typeof d.days==="object") ? d.days : {};
     state.content = (d.content && typeof d.content==="object") ? d.content : {};
-    Object.values(state.content).forEach(c=>{ if(typeof c.date!=="string") c.date=""; });
+    Object.values(state.content).forEach(c=>{ if(typeof c.date!=="string") c.date=""; if(!CHANNEL_KEYS.includes(c.channel)) c.channel=""; });
     if(typeof d.ideas==="string") state.ideas=d.ideas;
     saveLocal();
     const ae=document.activeElement;
@@ -679,7 +695,7 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
     for(const k in rd){ const ld=state.days[k]||{activities:[],todos:[]}; const day=rd[k]||{};
       state.days[k]={ activities:unionById(ld.activities, day.activities), todos:unionById(ld.todos, day.todos) }; }
     for(const id in rc){ state.content[id]=rc[id]; }
-    Object.values(state.content).forEach(c=>{ if(typeof c.date!=="string") c.date=""; });
+    Object.values(state.content).forEach(c=>{ if(typeof c.date!=="string") c.date=""; if(!CHANNEL_KEYS.includes(c.channel)) c.channel=""; });
     const ri = typeof r.ideas==="string"?r.ideas:"";
     if(ri && ri!==(state.ideas||"")){ state.ideas = (state.ideas ? state.ideas.replace(/\s+$/,"")+"\n\n" : "") + ri; }
     saveLocal();
@@ -759,6 +775,7 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
       const incoming={};
       snap.docs.forEach(d=>{ if(d.exists){ const v=d.data()||{};
         incoming[d.id]={platform:v.platform==="youtube"?"youtube":"instagram",
+          channel:CHANNEL_KEYS.includes(v.channel)?v.channel:"",
           status:STATUS_KEYS.includes(v.status)?v.status:"idea",
           title:v.title||"", notes:v.notes||"", date:typeof v.date==="string"?v.date:"", createdAt:v.createdAt||0}; }});
       if(firstContent && snap.empty && Object.keys(state.content).length){ firstContent=false; Object.keys(state.content).forEach(id=>persistContent(id,true)); }
@@ -930,11 +947,15 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
     if(contentIsEmpty()){
       const base=new Date();
       return SAMPLE_CONTENT.map((s,i)=>({id:"sample-"+i, ghost:true,
-        item:{platform:s.platform,status:s.status,title:s.title,notes:s.notes,date:keyOf(addDays(base,s.off)),createdAt:i}}));
+        item:{platform:s.platform,channel:s.channel,status:s.status,title:s.title,notes:s.notes,date:keyOf(addDays(base,s.off)),createdAt:i}}));
     }
     return Object.keys(state.content).map(id=>({id, ghost:false, item:state.content[id]}));
   }
-  function passFilter(item){ return state.filter==="all" || item.platform===state.filter; }
+  function passFilter(item){
+    if(state.filter!=="all" && item.platform!==state.filter) return false;
+    if(state.channelFilter!=="all" && (item.channel||"")!==state.channelFilter) return false;
+    return true;
+  }
 
   function autoGrow(t){ t.style.height="auto"; t.style.height=t.scrollHeight+"px"; }
 
@@ -944,7 +965,8 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
     const lg=el("span","logo"); lg.innerHTML=logoSvg(item.platform);
     const tx=el("span","tx"); tx.textContent=item.title || (item.platform==="youtube"?"YouTube":"Instagram");
     chip.appendChild(lg); chip.appendChild(tx);
-    chip.title=(item.title||"Untitled")+" · "+statusOf(item.status).label;
+    const ch=channelOf(item.channel);
+    chip.title=(item.title||"Untitled")+" · "+statusOf(item.status).label+(ch?" · "+ch.label:"");
     return chip;
   }
 
@@ -992,6 +1014,11 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
     card.appendChild(title); card.appendChild(notes);
 
     const foot=el("div","card-foot");
+    const chan=el("select","statussel channelsel"); chan.setAttribute("aria-label","Channel"); chan.disabled=ghost;
+    const chanNone=el("option"); chanNone.value=""; chanNone.textContent="No channel"; if(!item.channel) chanNone.selected=true; chan.appendChild(chanNone);
+    CHANNELS.forEach(c=>{ const o=el("option"); o.value=c.key; o.textContent=c.label; if(c.key===item.channel)o.selected=true; chan.appendChild(o); });
+    if(!ghost) chan.onchange=()=>{ item.channel=chan.value; persistContent(id,true); renderContentCal(); };
+    foot.appendChild(chan);
     const sel=el("select","statussel"); sel.setAttribute("aria-label","Status"); sel.disabled=ghost;
     STATUSES.forEach(s=>{ const o=el("option"); o.value=s.key; o.textContent=s.label; if(s.key===item.status)o.selected=true; sel.appendChild(o); });
     if(!ghost) sel.onchange=()=>{ item.status=sel.value; persistContent(id,true); renderContentCard(id); renderContentCal(); };
@@ -1072,7 +1099,7 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
 
   function addContent(platform, date){
     const id=uid();
-    state.content[id]={platform:platform, status:"idea", title:"", notes:"", date:date||"", createdAt:Date.now()};
+    state.content[id]={platform:platform, channel:"", status:"idea", title:"", notes:"", date:date||"", createdAt:Date.now()};
     persistContent(id,true);
     renderContentCal(); renderContentDay();
     requestAnimationFrame(()=>{ const card=document.querySelector('#cday .card[data-id="'+id+'"]'); if(card){ const t=card.querySelector(".title"); if(t) t.focus(); } });
@@ -1084,6 +1111,13 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
       renderContentCal(); renderContentDay();
     };
   });
+
+  (function initChannelFilter(){
+    const cf=$("chan-filter"); if(!cf) return;
+    CHANNELS.forEach(c=>{ const o=el("option"); o.value=c.key; o.textContent=c.label; cf.appendChild(o); });
+    cf.value=state.channelFilter;
+    cf.onchange=()=>{ state.channelFilter=cf.value; renderContentCal(); renderContentDay(); };
+  })();
 
   /* ================= IDEAS ================= */
   function updateNbMeta(){
@@ -1105,7 +1139,7 @@ Tip: select a line, then hit “→ Plan this” to send it to your Content pipe
   function planFromSelection(){
     const title=nbSelText(); if(!title) return;
     const id=uid();
-    state.content[id]={platform:"instagram", status:"idea", title:title, notes:"", date:"", createdAt:Date.now()};
+    state.content[id]={platform:"instagram", channel:"", status:"idea", title:title, notes:"", date:"", createdAt:Date.now()};
     persistContent(id,true);
     $("nb-plan").hidden=true;
     showToast("Added to Content · Unscheduled","View", ()=>{ state.filter="all"; document.querySelectorAll(".filt").forEach(x=>x.setAttribute("aria-selected", x.dataset.p==="all")); setView("content"); });
